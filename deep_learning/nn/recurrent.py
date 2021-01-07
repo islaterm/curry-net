@@ -5,7 +5,7 @@ Creative Commons Attribution 4.0 International License.
 You should have received a copy of the license along with this
 work. If not, see <http://creativecommons.org/licenses/by/4.0/>.
 """
-from typing import Optional, Tuple
+from typing import Optional
 
 import torch
 from torch import Tensor
@@ -16,6 +16,7 @@ class RecurrentNetwork(torch.nn.Module):
     """
     Implementation of a basic recurrent neural network with autoregression for language modeling.
     """
+    __embeddings: Embedding
     __classifier: Linear
     __lstm: LSTM
 
@@ -40,11 +41,12 @@ class RecurrentNetwork(torch.nn.Module):
                 an index to represent the padding.
         """
         super(RecurrentNetwork, self).__init__()
-        # embedding = Embedding(vocab_size, embedding_dim, padding_idx=pad_idx)
+        self.__embeddings = Embedding(vocab_size, embedding_dim, padding_idx=pad_idx)
         self.__lstm = LSTM(embedding_dim, hidden_dim, n_layers, dropout=dropout)
         self.__classifier = Linear(hidden_dim, output_size)
 
-    def forward(self, nn_input: Tensor, h_0: Optional[Tensor] = None) -> Tuple[Tensor, Tensor]:
-        out, h = self.__lstm(nn_input, h_0)
-        out = self.__classifier(functional.relu(out[:, -1]))
-        return out, h
+    def forward(self, nn_input: Tensor, h_0: Optional[Tensor] = None) -> Tensor:
+        word_embeddings = self.__embeddings(nn_input)
+        out, _ = self.__lstm(word_embeddings.view(len(nn_input), 1, -1), h_0)
+        out = self.__classifier(out.view(len(nn_input), -1))
+        return functional.log_softmax(out, dim=1)
